@@ -4,9 +4,9 @@
   "description": "Help humans listen to their music on their terms",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"electron .\"",
+    "dev": "vite",
     "build": "vite build && tsc --noEmit false --outDir dist-electron src/main/main.js",
-    "start": "concurrently -k \"vite\" \"electron .\"",
+    "start": "vite",
     "test": "vitest run",
     "fix-electron": "node scripts/fix-electron.js",
     "postinstall": "node scripts/fix-electron.js"
