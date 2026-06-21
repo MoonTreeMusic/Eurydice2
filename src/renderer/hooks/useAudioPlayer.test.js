@@ -180,4 +180,88 @@ describe('useAudioPlayer', () => {
     await act(async () => result.current.skipPrev())
     expect(result.current.currentIndex).toBe(0)
   })
+
+  it('skipNext on the last track wraps to the first', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+        { path: '/music/b.mp3', name: 'b.mp3', url: 'local-file:///music/b.mp3' },
+      ])
+    })
+    await act(async () => result.current.selectTrack(1)) // last track
+    await act(async () => result.current.skipNext())
+    expect(result.current.currentIndex).toBe(0)
+  })
+
+  it('prevTrack on the first track wraps to the last', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+        { path: '/music/b.mp3', name: 'b.mp3', url: 'local-file:///music/b.mp3' },
+      ])
+    })
+    // currentIndex is 0 (first track)
+    await act(async () => result.current.prevTrack())
+    expect(result.current.currentIndex).toBe(1)
+  })
+
+  it('skipPrev within the first 3s on the first track wraps to the last', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+        { path: '/music/b.mp3', name: 'b.mp3', url: 'local-file:///music/b.mp3' },
+      ])
+    })
+    mockAudio.currentTime = 1
+    await act(async () => result.current.skipPrev())
+    expect(result.current.currentIndex).toBe(1)
+  })
+
+  it('repeat-one replays the same track when it ends (does not advance or stop)', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+        { path: '/music/b.mp3', name: 'b.mp3', url: 'local-file:///music/b.mp3' },
+      ])
+    })
+    // off -> all -> one
+    await act(async () => result.current.toggleRepeat())
+    await act(async () => result.current.toggleRepeat())
+    expect(result.current.repeat).toBe('one')
+
+    mockAudio.currentTime = 42
+    await act(async () => mockAudio._emit('ended'))
+
+    expect(result.current.currentIndex).toBe(0) // same track
+    expect(mockAudio.currentTime).toBe(0) // restarted from the beginning
+    expect(mockAudio.paused).toBe(false) // still playing
+    expect(result.current.isPlaying).toBe(true)
+  })
+
+  it('repeat-off stops at the end of the last track', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+      ])
+    })
+    await act(async () => mockAudio._emit('ended'))
+    expect(result.current.currentIndex).toBeNull()
+    expect(result.current.isPlaying).toBe(false)
+  })
+
+  it('toggleRepeat cycles off → all → one → off', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    expect(result.current.repeat).toBe('off')
+    await act(async () => result.current.toggleRepeat())
+    expect(result.current.repeat).toBe('all')
+    await act(async () => result.current.toggleRepeat())
+    expect(result.current.repeat).toBe('one')
+    await act(async () => result.current.toggleRepeat())
+    expect(result.current.repeat).toBe('off')
+  })
 })

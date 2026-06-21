@@ -15,6 +15,10 @@ function makePlayer(overrides = {}) {
     skipNext: vi.fn(),
     skipPrev: vi.fn(),
     prevTrack: vi.fn(),
+    shuffle: false,
+    repeat: 'off',
+    toggleShuffle: vi.fn(),
+    toggleRepeat: vi.fn(),
     ...overrides,
   }
 }
@@ -57,5 +61,33 @@ describe('PlayerBar transport buttons', () => {
     render(<PlayerBar player={player} />)
     expect(screen.getByLabelText('Next track').disabled).toBe(true)
     expect(screen.getByLabelText(/Previous/).disabled).toBe(true)
+  })
+
+  it('shuffle button toggles shuffle and reflects active state', () => {
+    const player = makePlayer({ shuffle: true })
+    const { rerender } = render(<PlayerBar player={player} />)
+    const btn = screen.getByLabelText('Shuffle')
+    expect(btn.className).toContain('active')
+    fireEvent.click(btn)
+    expect(player.toggleShuffle).toHaveBeenCalledTimes(1)
+    rerender(<PlayerBar player={makePlayer({ shuffle: false })} />)
+    expect(screen.getByLabelText('Shuffle').className).not.toContain('active')
+  })
+
+  it('repeat button toggles repeat and shows the repeat-one icon', () => {
+    const player = makePlayer({ repeat: 'one' })
+    render(<PlayerBar player={player} />)
+    const btn = screen.getByLabelText('Repeat: one')
+    expect(btn.className).toContain('active')
+    expect(btn.textContent).toBe('🔂')
+    fireEvent.click(btn)
+    expect(player.toggleRepeat).toHaveBeenCalledTimes(1)
+  })
+
+  it('repeat button is inactive and shows the loop icon when off', () => {
+    render(<PlayerBar player={makePlayer({ repeat: 'off' })} />)
+    const btn = screen.getByLabelText('Repeat: off')
+    expect(btn.className).not.toContain('active')
+    expect(btn.textContent).toBe('🔁')
   })
 })

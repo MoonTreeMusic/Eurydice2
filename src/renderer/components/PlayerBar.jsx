@@ -17,6 +17,10 @@ export function PlayerBar({ player }) {
     skipNext,
     skipPrev,
     prevTrack,
+    shuffle,
+    repeat,
+    toggleShuffle,
+    toggleRepeat,
   } = player
 
   // The backward button distinguishes a single click (3-second rule: restart
@@ -58,6 +62,15 @@ export function PlayerBar({ player }) {
       <div className="player-bar-center">
         <div className="player-bar-controls">
           <button
+            className={`btn-toggle${shuffle ? ' active' : ''}`}
+            onClick={toggleShuffle}
+            aria-label="Shuffle"
+            aria-pressed={shuffle}
+            title={shuffle ? 'Shuffle: on' : 'Shuffle: off'}
+          >
+            🔀
+          </button>
+          <button
             className="btn-skip"
             onClick={handleBack}
             disabled={!currentTrack}
@@ -82,6 +95,20 @@ export function PlayerBar({ player }) {
             title="Next track"
           >
             ⏭
+          </button>
+          <button
+            className={`btn-toggle${repeat !== 'off' ? ' active' : ''}`}
+            onClick={toggleRepeat}
+            aria-label={`Repeat: ${repeat}`}
+            title={
+              repeat === 'one'
+                ? 'Repeat: one song'
+                : repeat === 'all'
+                  ? 'Repeat: all'
+                  : 'Repeat: off'
+            }
+          >
+            {repeat === 'one' ? '🔂' : '🔁'}
           </button>
         </div>
         <SeekBar currentTime={currentTime} duration={duration} onSeek={seek} />

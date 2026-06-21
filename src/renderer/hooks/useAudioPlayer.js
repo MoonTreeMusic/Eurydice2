@@ -41,17 +41,19 @@ export function useAudioPlayer() {
   // Keep ref in sync with state for use in callbacks
   useEffect(() => { currentIndexRef.current = currentIndex }, [currentIndex])
 
-  function getNextIndex(current) {
+  // `wrap` is set by the manual next/prev buttons so they loop around the ends
+  // regardless of repeat mode (auto-advance on song-end leaves it unset).
+  function getNextIndex(current, wrap = false) {
     const len = tracksRef.current.length
     if (len === 0) return null
     const rep = repeatRef.current
-    if (rep === 'one') return current
+    if (rep === 'one' && !wrap) return current
     if (shuffleRef.current) {
       const pos = shufflePosRef.current
       const q = shuffleQueueRef.current
       const nextPos = pos + 1
       if (nextPos >= q.length) {
-        if (rep === 'all') {
+        if (rep === 'all' || wrap) {
           // rebuild and start over
           const newQ = buildShuffleQueue(len, null)
           shuffleQueueRef.current = newQ
@@ -64,23 +66,30 @@ export function useAudioPlayer() {
       return q[nextPos]
     }
     const next = (current ?? -1) + 1
-    if (next >= len) return rep === 'all' ? 0 : null
+    if (next >= len) return rep === 'all' || wrap ? 0 : null
     return next
   }
 
-  function getPrevIndex(current) {
+  function getPrevIndex(current, wrap = false) {
     const len = tracksRef.current.length
     if (len === 0) return null
     if (shuffleRef.current) {
       const pos = shufflePosRef.current
       const q = shuffleQueueRef.current
       const prevPos = pos - 1
-      if (prevPos < 0) return q[0] ?? 0
+      if (prevPos < 0) {
+        if (wrap && q.length > 0) {
+          shufflePosRef.current = q.length - 1
+          return q[q.length - 1]
+        }
+        return q[0] ?? 0
+      }
       shufflePosRef.current = prevPos
       return q[prevPos]
     }
-    const prev = (current ?? 1) - 1
-    return prev < 0 ? 0 : prev
+    const prev = (current ?? 0) - 1
+    if (prev < 0) return wrap ? len - 1 : 0
+    return prev
   }
 
   function computeNextTrack() {
@@ -110,6 +119,13 @@ export function useAudioPlayer() {
     const onPlay = () => setIsPlaying(true)
     const onPause = () => setIsPlaying(false)
     const onEnded = () => {
+      // Repeat-one: replay the same track. Re-setting the same index won't
+      // re-run the load effect, so restart the element directly.
+      if (repeatRef.current === 'one') {
+        audio.currentTime = 0
+        audio.play().catch(() => {})
+        return
+      }
       setIsPlaying(false)
       setCurrentIndex((i) => {
         if (i === null) return null
@@ -228,7 +244,7 @@ export function useAudioPlayer() {
   const skipNext = useCallback(() => {
     const ci = currentIndexRef.current
     if (ci === null) return
-    const next = getNextIndex(ci)
+    const next = getNextIndex(ci, true)
     if (next !== null) setCurrentIndex(next)
   }, [])
 
@@ -240,7 +256,7 @@ export function useAudioPlayer() {
       audio.currentTime = 0
       return
     }
-    const prev = getPrevIndex(ci)
+    const prev = getPrevIndex(ci, true)
     if (prev !== null) setCurrentIndex(prev)
   }, [audio])
 
@@ -248,7 +264,7 @@ export function useAudioPlayer() {
   const prevTrack = useCallback(() => {
     const ci = currentIndexRef.current
     if (ci === null) return
-    const prev = getPrevIndex(ci)
+    const prev = getPrevIndex(ci, true)
     if (prev !== null) setCurrentIndex(prev)
   }, [])
 
