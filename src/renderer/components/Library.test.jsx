@@ -53,6 +53,22 @@ describe('Library reorder/remove context menu', () => {
     expect(renderedTitles()).toEqual(['One', 'Three'])
   })
 
+  it('invokes onRemoveFromLibrary with the track when "Remove from library" is clicked', () => {
+    const onRemoveFromLibrary = vi.fn()
+    render(
+      <Library
+        tracks={TRACKS}
+        currentTrack={null}
+        onPlayTrack={vi.fn()}
+        onRemoveFromLibrary={onRemoveFromLibrary}
+      />
+    )
+    openMenuOn('Two')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from library' }))
+    expect(onRemoveFromLibrary).toHaveBeenCalledTimes(1)
+    expect(onRemoveFromLibrary.mock.calls[0][0].title).toBe('Two')
+  })
+
   it('does not trigger playback when opening the context menu', () => {
     const onPlay = vi.fn()
     render(<Library tracks={TRACKS} currentTrack={null} onPlayTrack={onPlay} />)

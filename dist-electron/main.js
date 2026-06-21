@@ -11057,6 +11057,15 @@ async function scanFolder(folderPath, onProgress) {
   saveLibrary();
   return count;
 }
+function deleteTrack(id) {
+  const before = data.tracks.length;
+  data.tracks = data.tracks.filter((t) => t.id !== id);
+  for (const pl of data.playlists || []) {
+    pl.trackIds = pl.trackIds.filter((tid) => tid !== id);
+  }
+  if (data.tracks.length !== before) saveLibrary();
+  return { removed: before - data.tracks.length };
+}
 function getAllTracks() {
   return [...data.tracks].sort((a, b) => {
     const ac = a.artist.localeCompare(b.artist, void 0, { sensitivity: "base" });
@@ -11176,6 +11185,7 @@ electron.ipcMain.handle("open-file-dialog", async () => {
   }));
 });
 electron.ipcMain.handle("library:get-tracks", () => getAllTracks());
+electron.ipcMain.handle("library:delete-track", (_e, id) => deleteTrack(id));
 electron.ipcMain.handle("library:scan", async (event, folderPath) => {
   const count = await scanFolder(folderPath, (current, total) => {
     mainWindow == null ? void 0 : mainWindow.webContents.send("library:scan-progress", { current, total });

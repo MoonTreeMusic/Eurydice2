@@ -39,6 +39,17 @@ export default function App() {
     [player]
   )
 
+  const handleRemoveFromLibrary = useCallback(async (track) => {
+    const ok = window.confirm(
+      `Remove "${track.title}" from your library?\n\n` +
+        'This deletes the library entry only — the file on disk is not affected, ' +
+        'and re-scanning the folder will add it back.'
+    )
+    if (!ok) return
+    await window.electronAPI.deleteTrack(track.id)
+    setLibraryTracks((prev) => prev.filter((t) => t.id !== track.id))
+  }, [])
+
   return (
     <div className="app">
       <header className="app-header">
@@ -70,6 +81,7 @@ export default function App() {
             tracks={libraryTracks}
             currentTrack={player.currentTrack}
             onPlayTrack={handlePlayTrack}
+            onRemoveFromLibrary={handleRemoveFromLibrary}
           />
         )}
       </main>

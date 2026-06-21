@@ -86,6 +86,18 @@ export async function scanFolder(folderPath, onProgress) {
   return count
 }
 
+// Permanently removes a track's record from the library (and any playlists it
+// belongs to). Does not touch the file on disk; a re-scan will re-add it.
+export function deleteTrack(id) {
+  const before = data.tracks.length
+  data.tracks = data.tracks.filter((t) => t.id !== id)
+  for (const pl of data.playlists || []) {
+    pl.trackIds = pl.trackIds.filter((tid) => tid !== id)
+  }
+  if (data.tracks.length !== before) saveLibrary()
+  return { removed: before - data.tracks.length }
+}
+
 export function getAllTracks() {
   return [...data.tracks].sort((a, b) => {
     const ac = a.artist.localeCompare(b.artist, undefined, { sensitivity: 'base' })

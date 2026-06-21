@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Library API
   getTracks: () => ipcRenderer.invoke('library:get-tracks'),
+  deleteTrack: (id) => ipcRenderer.invoke('library:delete-track', id),
   scanFolder: (folderPath) => ipcRenderer.invoke('library:scan', folderPath),
   chooseFolder: () => ipcRenderer.invoke('library:choose-folder'),
   getSetting: (key) => ipcRenderer.invoke('library:get-setting', key),

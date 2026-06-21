@@ -4,6 +4,7 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   openFileDialog: () => electron.ipcRenderer.invoke("open-file-dialog"),
   // Library API
   getTracks: () => electron.ipcRenderer.invoke("library:get-tracks"),
+  deleteTrack: (id) => electron.ipcRenderer.invoke("library:delete-track", id),
   scanFolder: (folderPath) => electron.ipcRenderer.invoke("library:scan", folderPath),
   chooseFolder: () => electron.ipcRenderer.invoke("library:choose-folder"),
   getSetting: (key) => electron.ipcRenderer.invoke("library:get-setting", key),

@@ -6,6 +6,7 @@ import {
   loadLibrary,
   scanFolder,
   getAllTracks,
+  deleteTrack,
   getSetting,
   getAllPlaylists,
   getPlaylistWithTracks,
@@ -78,6 +79,8 @@ ipcMain.handle('open-file-dialog', async () => {
 })
 
 ipcMain.handle('library:get-tracks', () => getAllTracks())
+
+ipcMain.handle('library:delete-track', (_e, id) => deleteTrack(id))
 
 ipcMain.handle('library:scan', async (event, folderPath) => {
   const count = await scanFolder(folderPath, (current, total) => {

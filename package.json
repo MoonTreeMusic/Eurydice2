@@ -8,6 +8,7 @@
     "build": "vite build && tsc --noEmit false --outDir dist-electron src/main/main.js",
     "start": "vite",
     "test": "vitest run",
+    "clear-library": "node scripts/clear-library.js",
     "fix-electron": "node scripts/fix-electron.js",
     "postinstall": "node scripts/fix-electron.js"
   },
