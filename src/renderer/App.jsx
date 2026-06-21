@@ -42,7 +42,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1 className="app-title">Moo Music</h1>
+        <h1 className="app-title">Eurydice</h1>
         <div className="header-actions">
           {scanProgress ? (
             <span className="scan-status">

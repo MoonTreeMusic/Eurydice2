@@ -1,4 +1,4 @@
-# Moo Music
+# Eurydice
 
 A desktop music player. Help humans listen to their music on their terms.
 
