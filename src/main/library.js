@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { parseFile } from 'music-metadata'
+import ffmpeg from 'fluent-ffmpeg'
 
 const AUDIO_EXTS = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus', '.wma', '.webm'])
 
@@ -64,14 +64,14 @@ export async function scanFolder(folderPath, onProgress) {
   for (let i = 0; i < files.length; i++) {
     const filePath = files[i]
     try {
-      const { common, format } = await parseFile(filePath, { duration: true })
+      const metadata = await ffprobePromisified(filePath)
       upsertTrack({
         path: filePath,
-        title: common.title || path.basename(filePath, path.extname(filePath)),
-        artist: common.artist || common.albumartist || 'Unknown Artist',
-        album: common.album || 'Unknown Album',
-        trackNumber: common.track?.no || 0,
-        duration: format.duration || 0,
+        title: metadata.common.title || path.basename(filePath, path.extname(filePath)),
+        artist: metadata.common.artist || metadata.common.albumartist || 'Unknown Artist',
+        album: metadata.common.album || 'Unknown Album',
+        trackNumber: metadata.common.track || 0,
+        duration: metadata.format.duration || 0,
         scannedAt: Date.now(),
       })
       count++
@@ -84,6 +84,15 @@ export async function scanFolder(folderPath, onProgress) {
   data.settings.lastScanFolder = folderPath
   saveLibrary()
   return count
+}
+
+function ffprobePromisified(filePath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) return reject(err)
+      resolve(metadata)
+    })
+  })
 }
 
 // Permanently removes a track's record from the library (and any playlists it
