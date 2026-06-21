@@ -124,4 +124,60 @@ describe('useAudioPlayer', () => {
     expect(result.current.currentIndex).toBe(1)
     expect(result.current.currentTrack?.name).toBe('b.mp3')
   })
+
+  it('skipNext advances to the following track', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+        { path: '/music/b.mp3', name: 'b.mp3', url: 'local-file:///music/b.mp3' },
+      ])
+    })
+    await act(async () => result.current.skipNext())
+    expect(result.current.currentIndex).toBe(1)
+  })
+
+  it('prevTrack always moves to the previous track regardless of position', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+        { path: '/music/b.mp3', name: 'b.mp3', url: 'local-file:///music/b.mp3' },
+      ])
+    })
+    await act(async () => result.current.selectTrack(1))
+    // Even when well past 3s into the track, prevTrack goes to the previous one.
+    mockAudio.currentTime = 30
+    await act(async () => result.current.prevTrack())
+    expect(result.current.currentIndex).toBe(0)
+  })
+
+  it('skipPrev restarts the current track when more than 3s in (3-second rule)', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+        { path: '/music/b.mp3', name: 'b.mp3', url: 'local-file:///music/b.mp3' },
+      ])
+    })
+    await act(async () => result.current.selectTrack(1))
+    mockAudio.currentTime = 10
+    await act(async () => result.current.skipPrev())
+    expect(result.current.currentIndex).toBe(1) // stayed on same track
+    expect(mockAudio.currentTime).toBe(0) // restarted
+  })
+
+  it('skipPrev goes to the previous track when within the first 3s', async () => {
+    const { result } = renderHook(() => useAudioPlayer())
+    await act(async () => {
+      result.current.loadTracks([
+        { path: '/music/a.mp3', name: 'a.mp3', url: 'local-file:///music/a.mp3' },
+        { path: '/music/b.mp3', name: 'b.mp3', url: 'local-file:///music/b.mp3' },
+      ])
+    })
+    await act(async () => result.current.selectTrack(1))
+    mockAudio.currentTime = 1
+    await act(async () => result.current.skipPrev())
+    expect(result.current.currentIndex).toBe(0)
+  })
 })

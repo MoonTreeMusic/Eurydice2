@@ -244,6 +244,14 @@ export function useAudioPlayer() {
     if (prev !== null) setCurrentIndex(prev)
   }, [audio])
 
+  // Unconditionally move to the previous track (no restart heuristic).
+  const prevTrack = useCallback(() => {
+    const ci = currentIndexRef.current
+    if (ci === null) return
+    const prev = getPrevIndex(ci)
+    if (prev !== null) setCurrentIndex(prev)
+  }, [])
+
   const clearTracks = useCallback(() => {
     audio.pause()
     audio.src = ''
@@ -319,6 +327,7 @@ export function useAudioPlayer() {
     selectTrack,
     skipNext,
     skipPrev,
+    prevTrack,
     clearTracks,
     toggleShuffle,
     toggleRepeat,
