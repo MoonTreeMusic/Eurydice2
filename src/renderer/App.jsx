@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Library } from './components/Library'
+import { ViewTabs } from './components/ViewTabs'
+import { LibraryView } from './components/LibraryView'
+import { AlbumsView } from './components/AlbumsView'
+import { ArtistsView } from './components/ArtistsView'
+import { PlaylistsView } from './components/PlaylistsView'
 import { PlayerBar } from './components/PlayerBar'
 import { useAudioPlayer } from './hooks/useAudioPlayer'
 import { localFileUrl } from '../shared/format.js'
@@ -7,12 +11,32 @@ import { localFileUrl } from '../shared/format.js'
 export default function App() {
   const [libraryTracks, setLibraryTracks] = useState([])
   const [scanProgress, setScanProgress] = useState(null)
+  const [view, setView] = useState('library')
+  const [query, setQuery] = useState('')
+  const [playlists, setPlaylists] = useState([])
+  const [activePlaylist, setActivePlaylist] = useState(null) // { id, name, tracks }
   const player = useAudioPlayer()
+
+  const refreshPlaylists = useCallback(() => {
+    return window.electronAPI.getPlaylists().then(setPlaylists)
+  }, [])
+
+  const refreshActivePlaylist = useCallback(async (id) => {
+    const pl = await window.electronAPI.getPlaylistWithTracks(id)
+    setActivePlaylist(pl)
+    return pl
+  }, [])
 
   useEffect(() => {
     window.electronAPI.getTracks().then(setLibraryTracks)
+    refreshPlaylists()
     const unsub = window.electronAPI.onScanProgress((p) => setScanProgress(p))
     return unsub
+  }, [refreshPlaylists])
+
+  const changeView = useCallback((next) => {
+    setView(next)
+    setQuery('') // search resets per view
   }, [])
 
   const handleScanFolder = useCallback(async () => {
@@ -25,36 +49,162 @@ export default function App() {
   }, [])
 
   const handlePlayTrack = useCallback(
-    (track, albumTracks) => {
-      const playable = albumTracks.map((t) => ({
+    (track, queueTracks) => {
+      const playable = queueTracks.map((t) => ({
         id: t.id,
         path: t.path,
         name: t.title,
         artist: t.artist,
         url: localFileUrl(t.path),
       }))
-      const startIndex = albumTracks.findIndex((t) => t.id === track.id)
+      const startIndex = queueTracks.findIndex((t) => t.id === track.id)
       player.loadAndPlayAt(playable, startIndex >= 0 ? startIndex : 0)
     },
     [player]
   )
 
-  const handleRemoveFromLibrary = useCallback(async (track) => {
-    const ok = window.confirm(
-      `Remove "${track.title}" from your library?\n\n` +
-        'This deletes the library entry only — the file on disk is not affected, ' +
-        'and re-scanning the folder will add it back.'
-    )
-    if (!ok) return
-    await window.electronAPI.deleteTrack(track.id)
-    setLibraryTracks((prev) => prev.filter((t) => t.id !== track.id))
-  }, [])
+  const handleRemoveFromLibrary = useCallback(
+    async (track) => {
+      const ok = window.confirm(
+        `Remove "${track.title}" from your library?\n\n` +
+          'This deletes the library entry only — the file on disk is not affected, ' +
+          'and re-scanning the folder will add it back.'
+      )
+      if (!ok) return
+      await window.electronAPI.deleteTrack(track.id)
+      setLibraryTracks((prev) => prev.filter((t) => t.id !== track.id))
+      // The track may also have been in playlists.
+      refreshPlaylists()
+      if (activePlaylist) refreshActivePlaylist(activePlaylist.id)
+    },
+    [activePlaylist, refreshPlaylists, refreshActivePlaylist]
+  )
+
+  const handleAddToPlaylist = useCallback(
+    async (track, playlistId) => {
+      await window.electronAPI.addTrackToPlaylist(playlistId, track.id)
+      refreshPlaylists()
+      if (activePlaylist?.id === playlistId) refreshActivePlaylist(playlistId)
+    },
+    [activePlaylist, refreshPlaylists, refreshActivePlaylist]
+  )
+
+  const handleAddToNewPlaylist = useCallback(
+    async (track) => {
+      const name = window.prompt('New playlist name:', 'New Playlist')
+      if (name === null) return
+      const pl = await window.electronAPI.createPlaylist(name)
+      await window.electronAPI.addTrackToPlaylist(pl.id, track.id)
+      await refreshPlaylists()
+    },
+    [refreshPlaylists]
+  )
+
+  const handleCreatePlaylist = useCallback(async () => {
+    const name = window.prompt('New playlist name:', 'New Playlist')
+    if (name === null) return
+    const pl = await window.electronAPI.createPlaylist(name)
+    await refreshPlaylists()
+    await refreshActivePlaylist(pl.id)
+  }, [refreshPlaylists, refreshActivePlaylist])
+
+  const handleSelectPlaylist = useCallback(
+    (id) => refreshActivePlaylist(id),
+    [refreshActivePlaylist]
+  )
+
+  const handleDeletePlaylist = useCallback(
+    async (id) => {
+      const pl = playlists.find((p) => p.id === id)
+      if (!window.confirm(`Delete playlist "${pl?.name ?? ''}"? This cannot be undone.`)) return
+      await window.electronAPI.deletePlaylist(id)
+      await refreshPlaylists()
+      setActivePlaylist((cur) => (cur?.id === id ? null : cur))
+    },
+    [playlists, refreshPlaylists]
+  )
+
+  const handleReorderPlaylist = useCallback(
+    async (id, trackIds) => {
+      await window.electronAPI.reorderPlaylistTracks(id, trackIds)
+      refreshActivePlaylist(id)
+    },
+    [refreshActivePlaylist]
+  )
+
+  const handleRemoveFromPlaylist = useCallback(
+    async (id, track) => {
+      await window.electronAPI.removeTrackFromPlaylist(id, track.id)
+      refreshActivePlaylist(id)
+      refreshPlaylists()
+    },
+    [refreshActivePlaylist, refreshPlaylists]
+  )
+
+  // Shared track context-menu actions passed to every view.
+  const menuProps = {
+    playlists,
+    onAddToPlaylist: handleAddToPlaylist,
+    onAddToNewPlaylist: handleAddToNewPlaylist,
+    onRemoveFromLibrary: handleRemoveFromLibrary,
+  }
+
+  const viewShared = {
+    tracks: libraryTracks,
+    query,
+    currentTrack: player.currentTrack,
+    onPlayTrack: handlePlayTrack,
+    menuProps,
+  }
+
+  function renderView() {
+    if (view === 'playlists') {
+      return (
+        <PlaylistsView
+          playlists={playlists}
+          activePlaylist={activePlaylist}
+          query={query}
+          currentTrack={player.currentTrack}
+          onPlayTrack={handlePlayTrack}
+          onCreatePlaylist={handleCreatePlaylist}
+          onSelectPlaylist={handleSelectPlaylist}
+          onDeletePlaylist={handleDeletePlaylist}
+          onReorderPlaylist={handleReorderPlaylist}
+          onRemoveFromPlaylist={handleRemoveFromPlaylist}
+          menuProps={menuProps}
+        />
+      )
+    }
+    if (libraryTracks.length === 0) {
+      return (
+        <div className="empty-state">
+          <div className="empty-icon">♪</div>
+          <p className="empty-message">No music in library</p>
+          <button className="btn-icon" onClick={handleScanFolder}>
+            Scan a Folder
+          </button>
+        </div>
+      )
+    }
+    if (view === 'albums') return <AlbumsView {...viewShared} />
+    if (view === 'artists') return <ArtistsView {...viewShared} />
+    return <LibraryView {...viewShared} />
+  }
 
   return (
     <div className="app">
       <header className="app-header">
         <h1 className="app-title">Eurydice</h1>
+        <ViewTabs view={view} onChange={changeView} />
         <div className="header-actions">
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Search…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search tracks"
+          />
           {scanProgress ? (
             <span className="scan-status">
               Scanning {scanProgress.current}/{scanProgress.total || '…'}
@@ -67,24 +217,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="app-main">
-        {libraryTracks.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">♪</div>
-            <p className="empty-message">No music in library</p>
-            <button className="btn-icon" onClick={handleScanFolder}>
-              Scan a Folder
-            </button>
-          </div>
-        ) : (
-          <Library
-            tracks={libraryTracks}
-            currentTrack={player.currentTrack}
-            onPlayTrack={handlePlayTrack}
-            onRemoveFromLibrary={handleRemoveFromLibrary}
-          />
-        )}
-      </main>
+      <main className="app-main">{renderView()}</main>
 
       <PlayerBar player={player} />
     </div>

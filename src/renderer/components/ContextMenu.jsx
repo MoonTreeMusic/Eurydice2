@@ -35,21 +35,25 @@ export function ContextMenu({ x, y, items, onClose }) {
 
   return (
     <div className="context-menu" ref={ref} role="menu" style={{ position: 'fixed', ...pos }}>
-      {items.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          role="menuitem"
-          className={`context-menu-item${item.danger ? ' danger' : ''}`}
-          disabled={item.disabled}
-          onClick={() => {
-            item.onClick()
-            onClose()
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
+      {items.map((item, i) =>
+        item.separator ? (
+          <div key={`sep-${i}`} className="context-menu-separator" role="separator" />
+        ) : (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            className={`context-menu-item${item.danger ? ' danger' : ''}`}
+            disabled={item.disabled}
+            onClick={() => {
+              item.onClick()
+              onClose()
+            }}
+          >
+            {item.label}
+          </button>
+        )
+      )}
     </div>
   )
 }
