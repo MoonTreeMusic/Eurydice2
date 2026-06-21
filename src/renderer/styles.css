@@ -211,6 +211,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
+  min-width: 0;
 }
 
 .time {
@@ -259,8 +261,14 @@ body {
   transition: opacity 0.15s;
 }
 
-.seek-track:hover .seek-thumb {
+.seek-track:hover .seek-thumb,
+.seek-track.dragging .seek-thumb {
   opacity: 1;
+}
+
+.seek-track:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 /* Transport */
