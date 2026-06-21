@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { fileURLToPath } from 'url'
 import path from 'path'
+import { localFileUrl } from '../shared/format.js'
 import {
   loadLibrary,
   scanFolder,
@@ -47,12 +48,6 @@ function createWindow() {
 app.whenReady().then(() => {
   loadLibrary()
 
-  // Register local-file protocol so renderer can stream audio safely
-  protocol.registerFileProtocol('local-file', (request, callback) => {
-    const filePath = decodeURIComponent(request.url.replace('local-file://', ''))
-    callback({ path: filePath })
-  })
-
   createWindow()
 
   app.on('activate', () => {
@@ -78,7 +73,7 @@ ipcMain.handle('open-file-dialog', async () => {
   return result.filePaths.map((filePath) => ({
     path: filePath,
     name: path.basename(filePath),
-    url: `local-file://${filePath}`,
+    url: localFileUrl(filePath),
   }))
 })
 

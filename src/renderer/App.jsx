@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Library } from './components/Library'
 import { PlayerBar } from './components/PlayerBar'
 import { useAudioPlayer } from './hooks/useAudioPlayer'
+import { localFileUrl } from '../shared/format.js'
 
 export default function App() {
   const [libraryTracks, setLibraryTracks] = useState([])
@@ -29,7 +30,7 @@ export default function App() {
         path: t.path,
         name: t.title,
         artist: t.artist,
-        url: `local-file://${t.path.replace(/\\/g, '/')}`,
+        url: localFileUrl(t.path),
       }))
       const startIndex = albumTracks.findIndex((t) => t.id === track.id)
       player.loadAndPlayAt(playable, startIndex >= 0 ? startIndex : 0)

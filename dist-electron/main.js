@@ -7,6 +7,12 @@ const require$$1 = require("tty");
 const require$$1$1 = require("util");
 const require$$0 = require("os");
 var _documentCurrentScript = typeof document !== "undefined" ? document.currentScript : null;
+function localFileUrl(absPath) {
+  const normalized = absPath.replace(/\\/g, "/");
+  const withLeadingSlash = normalized.startsWith("/") ? normalized : `/${normalized}`;
+  const encoded = withLeadingSlash.split("/").map((segment) => /^[A-Za-z]:$/.test(segment) ? segment : encodeURIComponent(segment)).join("/");
+  return `file://${encoded}`;
+}
 var lib$3 = {};
 var lib$2 = {};
 var FsPromise = {};
@@ -11146,10 +11152,6 @@ function createWindow() {
 }
 electron.app.whenReady().then(() => {
   loadLibrary();
-  electron.protocol.registerFileProtocol("local-file", (request, callback) => {
-    const filePath = decodeURIComponent(request.url.replace("local-file://", ""));
-    callback({ path: filePath });
-  });
   createWindow();
   electron.app.on("activate", () => {
     if (electron.BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -11170,7 +11172,7 @@ electron.ipcMain.handle("open-file-dialog", async () => {
   return result.filePaths.map((filePath) => ({
     path: filePath,
     name: path.basename(filePath),
-    url: `local-file://${filePath}`
+    url: localFileUrl(filePath)
   }));
 });
 electron.ipcMain.handle("library:get-tracks", () => getAllTracks());
