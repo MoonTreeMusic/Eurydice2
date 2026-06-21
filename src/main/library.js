@@ -3,7 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import { parseFile } from 'music-metadata'
 
-const AUDIO_EXTS = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus', '.wma'])
+const AUDIO_EXTS = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus', '.wma', '.webm'])
 
 function getLibraryPath() {
   return path.join(app.getPath('userData'), 'library.json')

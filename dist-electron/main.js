@@ -10987,7 +10987,7 @@ RandomFileReader$1.RandomFileReader = RandomFileReader;
     selectCover: Core.selectCover
   };
 })(lib$3);
-const AUDIO_EXTS = /* @__PURE__ */ new Set([".mp3", ".flac", ".aac", ".ogg", ".wav", ".m4a", ".opus", ".wma"]);
+const AUDIO_EXTS = /* @__PURE__ */ new Set([".mp3", ".flac", ".aac", ".ogg", ".wav", ".m4a", ".opus", ".wma", ".webm"]);
 function getLibraryPath() {
   return path.join(electron.app.getPath("userData"), "library.json");
 }
@@ -11173,7 +11173,7 @@ electron.ipcMain.handle("open-file-dialog", async () => {
   const result = await electron.dialog.showOpenDialog(mainWindow, {
     properties: ["openFile", "multiSelections"],
     filters: [
-      { name: "Audio Files", extensions: ["mp3", "flac", "m4a", "wav", "ogg", "aac", "wma"] },
+      { name: "Audio Files", extensions: ["mp3", "flac", "m4a", "wav", "ogg", "aac", "wma", "webm"] },
       { name: "All Files", extensions: ["*"] }
     ]
   });
