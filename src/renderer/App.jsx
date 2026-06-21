@@ -27,6 +27,7 @@ export default function App() {
   const handlePlayTrack = useCallback(
     (track, albumTracks) => {
       const playable = albumTracks.map((t) => ({
+        id: t.id,
         path: t.path,
         name: t.title,
         artist: t.artist,
