@@ -3412,12 +3412,15 @@ async function scanFolder(folderPath, onProgress) {
     const filePath = files[i];
     try {
       const metadata = await ffprobePromisified(filePath);
+      const tags = metadata.format.tags || {};
+      const artist = tags.artist || tags.album_artist || tags.albumartist || "Unknown Artist";
+      const trackNum = tags.track || tags.tracknumber || tags.trkn || "0";
       upsertTrack({
         path: filePath,
-        title: metadata.common.title || path$2.basename(filePath, path$2.extname(filePath)),
-        artist: metadata.common.artist || metadata.common.albumartist || "Unknown Artist",
-        album: metadata.common.album || "Unknown Album",
-        trackNumber: metadata.common.track || 0,
+        title: tags.title || path$2.basename(filePath, path$2.extname(filePath)),
+        artist,
+        album: tags.album || "Unknown Album",
+        trackNumber: parseInt(trackNum) || 0,
         duration: metadata.format.duration || 0,
         scannedAt: Date.now()
       });
