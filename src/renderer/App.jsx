@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ViewTabs } from './components/ViewTabs'
 import { LibraryView } from './components/LibraryView'
 import { AlbumsView } from './components/AlbumsView'
 import { ArtistsView } from './components/ArtistsView'
 import { PlaylistsView } from './components/PlaylistsView'
 import { PlayerBar } from './components/PlayerBar'
+import { PromptDialog } from './components/PromptDialog'
 import { useAudioPlayer } from './hooks/useAudioPlayer'
 import { localFileUrl } from '../shared/format.js'
 
@@ -15,7 +16,25 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [playlists, setPlaylists] = useState([])
   const [activePlaylist, setActivePlaylist] = useState(null) // { id, name, tracks }
+  const [prompt, setPrompt] = useState(null) // { title, defaultValue }
+  const promptResolve = useRef(null)
   const player = useAudioPlayer()
+
+  // window.prompt() isn't supported in Electron, so use an in-app dialog.
+  // Resolves to the entered string, or null if cancelled.
+  const askName = useCallback((title, defaultValue = '') => {
+    return new Promise((resolve) => {
+      promptResolve.current = resolve
+      setPrompt({ title, defaultValue })
+    })
+  }, [])
+
+  const closePrompt = useCallback((value) => {
+    setPrompt(null)
+    const resolve = promptResolve.current
+    promptResolve.current = null
+    resolve?.(value)
+  }, [])
 
   const refreshPlaylists = useCallback(() => {
     return window.electronAPI.getPlaylists().then(setPlaylists)
@@ -91,22 +110,22 @@ export default function App() {
 
   const handleAddToNewPlaylist = useCallback(
     async (track) => {
-      const name = window.prompt('New playlist name:', 'New Playlist')
-      if (name === null) return
+      const name = await askName('New playlist name', 'New Playlist')
+      if (!name) return
       const pl = await window.electronAPI.createPlaylist(name)
       await window.electronAPI.addTrackToPlaylist(pl.id, track.id)
       await refreshPlaylists()
     },
-    [refreshPlaylists]
+    [askName, refreshPlaylists]
   )
 
   const handleCreatePlaylist = useCallback(async () => {
-    const name = window.prompt('New playlist name:', 'New Playlist')
-    if (name === null) return
+    const name = await askName('New playlist name', 'New Playlist')
+    if (!name) return
     const pl = await window.electronAPI.createPlaylist(name)
     await refreshPlaylists()
     await refreshActivePlaylist(pl.id)
-  }, [refreshPlaylists, refreshActivePlaylist])
+  }, [askName, refreshPlaylists, refreshActivePlaylist])
 
   const handleSelectPlaylist = useCallback(
     (id) => refreshActivePlaylist(id),
@@ -220,6 +239,15 @@ export default function App() {
       <main className="app-main">{renderView()}</main>
 
       <PlayerBar player={player} />
+
+      {prompt && (
+        <PromptDialog
+          title={prompt.title}
+          defaultValue={prompt.defaultValue}
+          onSubmit={(value) => closePrompt(value)}
+          onCancel={() => closePrompt(null)}
+        />
+      )}
     </div>
   )
 }
