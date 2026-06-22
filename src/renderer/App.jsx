@@ -7,21 +7,20 @@ import { PlaylistsView } from './components/PlaylistsView'
 import { PlayerBar } from './components/PlayerBar'
 import { PromptDialog } from './components/PromptDialog'
 import { useAudioPlayer } from './hooks/useAudioPlayer'
-import { localFileUrl } from '../shared/format.js'
+import { useAuth, apiClient } from './hooks/useAuth'
 
 export default function App() {
+  const { isAuthenticated, isLoading, login } = useAuth()
   const [libraryTracks, setLibraryTracks] = useState([])
   const [scanProgress, setScanProgress] = useState(null)
   const [view, setView] = useState('library')
   const [query, setQuery] = useState('')
   const [playlists, setPlaylists] = useState([])
-  const [activePlaylist, setActivePlaylist] = useState(null) // { id, name, tracks }
-  const [prompt, setPrompt] = useState(null) // { title, defaultValue }
+  const [activePlaylist, setActivePlaylist] = useState(null)
+  const [prompt, setPrompt] = useState(null)
   const promptResolve = useRef(null)
   const player = useAudioPlayer()
 
-  // window.prompt() isn't supported in Electron, so use an in-app dialog.
-  // Resolves to the entered string, or null if cancelled.
   const askName = useCallback((title, defaultValue = '') => {
     return new Promise((resolve) => {
       promptResolve.current = resolve
@@ -37,47 +36,89 @@ export default function App() {
   }, [])
 
   const refreshPlaylists = useCallback(() => {
-    return window.electronAPI.getPlaylists().then(setPlaylists)
+    return apiClient.getPlaylists().then(setPlaylists)
   }, [])
 
   const refreshActivePlaylist = useCallback(async (id) => {
-    const pl = await window.electronAPI.getPlaylistWithTracks(id)
+    const pl = await apiClient.getPlaylistWithTracks(id)
     setActivePlaylist(pl)
     return pl
   }, [])
 
   useEffect(() => {
-    window.electronAPI.getTracks().then(setLibraryTracks)
-    refreshPlaylists()
-    const unsub = window.electronAPI.onScanProgress((p) => setScanProgress(p))
-    return unsub
-  }, [refreshPlaylists])
+    if (isAuthenticated) {
+      apiClient.getTracks().then(setLibraryTracks)
+      refreshPlaylists()
+    }
+  }, [isAuthenticated, refreshPlaylists])
 
   const changeView = useCallback((next) => {
     setView(next)
-    setQuery('') // search resets per view
+    setQuery('')
   }, [])
 
   const handleScanFolder = useCallback(async () => {
-    const folderPath = await window.electronAPI.chooseFolder()
-    if (!folderPath) return
-    setScanProgress({ current: 0, total: 0 })
-    const result = await window.electronAPI.scanFolder(folderPath)
-    setScanProgress(null)
-    setLibraryTracks(result.tracks)
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.accept = '.mp3,.flac,.aac,.ogg,.wav,.m4a,.opus,.wma,.webm'
+
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files)
+      if (files.length === 0) return
+
+      setScanProgress({ current: 0, total: files.length })
+
+      try {
+        const filesData = await Promise.all(
+          files.map(async (file) => ({
+            filename: file.name,
+            data: await file.arrayBuffer().then((buf) => Buffer.from(buf).toString('base64')),
+          }))
+        )
+
+        const result = await apiClient.scanFolder(filesData)
+        setLibraryTracks(result.tracks)
+      } catch (error) {
+        console.error('Scan failed:', error)
+        alert('Scan failed: ' + error.message)
+      } finally {
+        setScanProgress(null)
+      }
+    }
+
+    input.click()
   }, [])
 
   const handlePlayTrack = useCallback(
-    (track, queueTracks) => {
-      const playable = queueTracks.map((t) => ({
-        id: t.id,
-        path: t.path,
-        name: t.title,
-        artist: t.artist,
-        url: localFileUrl(t.path),
-      }))
-      const startIndex = queueTracks.findIndex((t) => t.id === track.id)
-      player.loadAndPlayAt(playable, startIndex >= 0 ? startIndex : 0)
+    async (track, queueTracks) => {
+      try {
+        const playable = await Promise.all(
+          queueTracks.map(async (t) => {
+            try {
+              const { url } = await apiClient.getAudioUrl(t.id)
+              return {
+                id: t.id,
+                name: t.title,
+                artist: t.artist,
+                url,
+              }
+            } catch {
+              return {
+                id: t.id,
+                name: t.title,
+                artist: t.artist,
+                url: null,
+              }
+            }
+          })
+        )
+        const startIndex = queueTracks.findIndex((t) => t.id === track.id)
+        player.loadAndPlayAt(playable, startIndex >= 0 ? startIndex : 0)
+      } catch (error) {
+        console.error('Failed to get audio URL:', error)
+        alert('Failed to play track: ' + error.message)
+      }
     },
     [player]
   )
@@ -87,12 +128,11 @@ export default function App() {
       const ok = window.confirm(
         `Remove "${track.title}" from your library?\n\n` +
           'This deletes the library entry only — the file on disk is not affected, ' +
-          'and re-scanning the folder will add it back.'
+          'and re-scanning will add it back.'
       )
       if (!ok) return
-      await window.electronAPI.deleteTrack(track.id)
+      await apiClient.deleteTrack(track.id)
       setLibraryTracks((prev) => prev.filter((t) => t.id !== track.id))
-      // The track may also have been in playlists.
       refreshPlaylists()
       if (activePlaylist) refreshActivePlaylist(activePlaylist.id)
     },
@@ -101,7 +141,7 @@ export default function App() {
 
   const handleAddToPlaylist = useCallback(
     async (track, playlistId) => {
-      await window.electronAPI.addTrackToPlaylist(playlistId, track.id)
+      await apiClient.addTrackToPlaylist(playlistId, track.id)
       refreshPlaylists()
       if (activePlaylist?.id === playlistId) refreshActivePlaylist(playlistId)
     },
@@ -112,8 +152,8 @@ export default function App() {
     async (track) => {
       const name = await askName('New playlist name', 'New Playlist')
       if (!name) return
-      const pl = await window.electronAPI.createPlaylist(name)
-      await window.electronAPI.addTrackToPlaylist(pl.id, track.id)
+      const pl = await apiClient.createPlaylist(name)
+      await apiClient.addTrackToPlaylist(pl.id, track.id)
       await refreshPlaylists()
     },
     [askName, refreshPlaylists]
@@ -122,7 +162,7 @@ export default function App() {
   const handleCreatePlaylist = useCallback(async () => {
     const name = await askName('New playlist name', 'New Playlist')
     if (!name) return
-    const pl = await window.electronAPI.createPlaylist(name)
+    const pl = await apiClient.createPlaylist(name)
     await refreshPlaylists()
     await refreshActivePlaylist(pl.id)
   }, [askName, refreshPlaylists, refreshActivePlaylist])
@@ -136,7 +176,7 @@ export default function App() {
     async (id) => {
       const pl = playlists.find((p) => p.id === id)
       if (!window.confirm(`Delete playlist "${pl?.name ?? ''}"? This cannot be undone.`)) return
-      await window.electronAPI.deletePlaylist(id)
+      await apiClient.deletePlaylist(id)
       await refreshPlaylists()
       setActivePlaylist((cur) => (cur?.id === id ? null : cur))
     },
@@ -145,7 +185,7 @@ export default function App() {
 
   const handleReorderPlaylist = useCallback(
     async (id, trackIds) => {
-      await window.electronAPI.reorderPlaylistTracks(id, trackIds)
+      await apiClient.reorderPlaylistTracks(id, trackIds)
       refreshActivePlaylist(id)
     },
     [refreshActivePlaylist]
@@ -153,14 +193,13 @@ export default function App() {
 
   const handleRemoveFromPlaylist = useCallback(
     async (id, track) => {
-      await window.electronAPI.removeTrackFromPlaylist(id, track.id)
+      await apiClient.removeTrackFromPlaylist(id, track.id)
       refreshActivePlaylist(id)
       refreshPlaylists()
     },
     [refreshActivePlaylist, refreshPlaylists]
   )
 
-  // Shared track context-menu actions passed to every view.
   const menuProps = {
     playlists,
     onAddToPlaylist: handleAddToPlaylist,
@@ -174,6 +213,28 @@ export default function App() {
     currentTrack: player.currentTrack,
     onPlayTrack: handlePlayTrack,
     menuProps,
+  }
+
+  if (isLoading) {
+    return (
+      <div className="app">
+        <div className="loading">Loading...</div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="app">
+        <div className="login-screen">
+          <h1>Eurydice</h1>
+          <p>Sign in to access your music library</p>
+          <button className="btn-primary" onClick={login}>
+            Sign in with Microsoft
+          </button>
+        </div>
+      </div>
+    )
   }
 
   function renderView() {

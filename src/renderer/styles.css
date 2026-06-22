@@ -929,3 +929,39 @@ body {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.login-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 20px;
+}
+
+.login-screen h1 {
+  font-size: 32px;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+
+.login-screen p {
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.login-screen .btn-primary {
+  padding: 12px 32px;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
