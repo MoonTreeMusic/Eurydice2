@@ -965,3 +965,12 @@ body {
   border-radius: 8px;
   cursor: pointer;
 }
+
+.login-error {
+  color: var(--danger);
+  max-width: 400px;
+  text-align: center;
+  padding: 10px;
+  background: rgba(224, 75, 75, 0.1);
+  border-radius: 4px;
+}

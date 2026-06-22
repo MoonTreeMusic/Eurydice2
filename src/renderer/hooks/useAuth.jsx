@@ -27,12 +27,17 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = useCallback(async () => {
-    const success = await apiClient.login()
-    if (success) {
-      setAccount(apiClient.getAccount())
-      setIsAuthenticated(true)
+    try {
+      const success = await apiClient.login()
+      if (success) {
+        setAccount(apiClient.getAccount())
+        setIsAuthenticated(true)
+      }
+      return success
+    } catch (error) {
+      console.error('Login callback error:', error)
+      return false
     }
-    return success
   }, [])
 
   const logout = useCallback(() => {

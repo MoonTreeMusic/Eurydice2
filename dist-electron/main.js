@@ -3532,9 +3532,7 @@ function createWindow() {
     webPreferences: {
       preload: path$2.join(__dirname$1, "preload.js"),
       nodeIntegration: false,
-      contextIsolation: true,
-      webSecurity: false
-      // Allow local file:// URLs in audio elements
+      contextIsolation: true
     }
   });
   if (isDev) {

@@ -18,8 +18,17 @@ export default function App() {
   const [playlists, setPlaylists] = useState([])
   const [activePlaylist, setActivePlaylist] = useState(null)
   const [prompt, setPrompt] = useState(null)
+  const [loginError, setLoginError] = useState(null)
   const promptResolve = useRef(null)
   const player = useAudioPlayer()
+
+  const handleLogin = useCallback(async () => {
+    setLoginError(null)
+    const success = await login()
+    if (!success) {
+      setLoginError('Login failed. Please check your Azure configuration and try again.')
+    }
+  }, [login])
 
   const askName = useCallback((title, defaultValue = '') => {
     return new Promise((resolve) => {
@@ -73,7 +82,14 @@ export default function App() {
         const filesData = await Promise.all(
           files.map(async (file) => ({
             filename: file.name,
-            data: await file.arrayBuffer().then((buf) => Buffer.from(buf).toString('base64')),
+            data: await file.arrayBuffer().then((buf) => {
+              const bytes = new Uint8Array(buf)
+              let binary = ''
+              for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i])
+              }
+              return btoa(binary)
+            }),
           }))
         )
 
@@ -229,9 +245,10 @@ export default function App() {
         <div className="login-screen">
           <h1>Eurydice</h1>
           <p>Sign in to access your music library</p>
-          <button className="btn-primary" onClick={login}>
+          <button className="btn-primary" onClick={handleLogin}>
             Sign in with Microsoft
           </button>
+          {loginError && <p className="login-error">{loginError}</p>}
         </div>
       </div>
     )

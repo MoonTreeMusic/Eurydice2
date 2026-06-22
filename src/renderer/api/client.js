@@ -1,16 +1,10 @@
 const MSAL_CONFIG = {
   auth: {
     clientId: import.meta.env.VITE_AZURE_CLIENT_ID || '',
-    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID || 'common'}`,
-    redirectUri: window.location.origin,
+    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}`,
+    redirectUri: 'http://localhost:5173',
   },
 }
-
-const LOGIN_REQUEST = {
-  scopes: ['User.Read'],
-}
-
-const API_SCOPES = [import.meta.env.VITE_AZURE_API_AUDIENCE || 'api://default']
 
 class EurydiceApiClient {
   constructor() {
@@ -18,52 +12,98 @@ class EurydiceApiClient {
     this.account = null
     this.accessToken = null
     this.apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+    const clientId = import.meta.env.VITE_AZURE_CLIENT_ID
+    const tenantId = import.meta.env.VITE_AZURE_TENANT_ID
+    const audience = import.meta.env.VITE_AZURE_API_AUDIENCE
+    console.log('EurydiceApiClient initialized, config:', {
+      clientId,
+      clientIdLength: clientId ? clientId.length : 0,
+      tenantId,
+      tenantIdLength: tenantId ? tenantId.length : 0,
+      audience,
+      audienceLength: audience ? audience.length : 0,
+      apiBaseUrl: this.apiBaseUrl,
+    })
   }
 
   async initialize() {
+    console.log('Initializing MSAL...')
     const { PublicClientApplication } = await import('@azure/msal-browser')
     this.msalInstance = new PublicClientApplication(MSAL_CONFIG)
     await this.msalInstance.initialize()
+    console.log('MSAL initialized')
 
     const accounts = this.msalInstance.getAllAccounts()
     if (accounts.length > 0) {
       this.account = accounts[0]
       this.msalInstance.setActiveAccount(this.account)
+      console.log('Found existing account:', this.account)
     }
   }
 
   async login() {
+    console.log('Login called')
     if (!this.msalInstance) await this.initialize()
 
+    const clientId = import.meta.env.VITE_AZURE_CLIENT_ID
+    // Use GUID-based scope for MSAL, not api:// format
+    const apiScope = `${clientId}/.default`
+    const loginRequest = {
+      scopes: [apiScope],
+    }
+    console.log('Login request:', loginRequest)
+
     try {
-      const result = await this.msalInstance.loginPopup(LOGIN_REQUEST)
+      const result = await this.msalInstance.loginPopup(loginRequest)
+      console.log('Login popup result:', result)
       this.account = result.account
-      await this.acquireToken()
-      return true
+      
+      // Now acquire token for API access
+      const tokenResult = await this.acquireToken()
+      console.log('Token acquisition result:', tokenResult)
+      
+      return tokenResult
     } catch (error) {
       console.error('Login failed:', error)
+      console.error('Error name:', error.name)
+      console.error('Error message:', error.message)
       return false
     }
   }
 
   async acquireToken() {
-    if (!this.msalInstance || !this.account) return false
+    if (!this.msalInstance || !this.account) {
+      console.log('Cannot acquire token: no MSAL instance or account')
+      return false
+    }
+
+    const clientId = import.meta.env.VITE_AZURE_CLIENT_ID
+    // Use GUID-based scope for MSAL
+    const apiScope = `${clientId}/.default`
+    const tokenRequest = {
+      scopes: [apiScope],
+    }
+
+    console.log('Acquiring token with request:', tokenRequest)
 
     try {
       const result = await this.msalInstance.acquireTokenSilent({
-        scopes: API_SCOPES,
+        ...tokenRequest,
         account: this.account,
       })
       this.accessToken = result.accessToken
+      console.log('Silent token acquired')
       return true
     } catch (error) {
+      console.log('Silent token failed:', error.name)
       if (error.name === 'InteractionRequiredAuthError') {
         try {
-          const result = await this.msalInstance.acquireTokenPopup({ scopes: API_SCOPES })
+          const result = await this.msalInstance.acquireTokenPopup(tokenRequest)
           this.accessToken = result.accessToken
+          console.log('Popup token acquired')
           return true
         } catch (popupError) {
-          console.error('Token acquisition failed:', popupError)
+          console.error('Popup token acquisition failed:', popupError)
           return false
         }
       }
@@ -74,13 +114,17 @@ class EurydiceApiClient {
 
   async ensureAuthenticated() {
     if (!this.accessToken) {
+      console.log('No access token, attempting to acquire...')
       return await this.acquireToken()
     }
     return true
   }
 
   async fetch(endpoint, options = {}) {
-    await this.ensureAuthenticated()
+    const authResult = await this.ensureAuthenticated()
+    if (!authResult) {
+      throw new Error('Authentication failed')
+    }
 
     const headers = {
       'Content-Type': 'application/json',
@@ -88,10 +132,18 @@ class EurydiceApiClient {
       ...options.headers,
     }
 
+    console.log(`Fetching: ${this.apiBaseUrl}${endpoint}`)
+
     const response = await fetch(`${this.apiBaseUrl}${endpoint}`, {
       ...options,
       headers,
     })
+
+    if (response.status === 401) {
+      console.log('Got 401, token might be expired, clearing...')
+      this.accessToken = null
+      throw new Error('Token expired or invalid')
+    }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: response.statusText }))
