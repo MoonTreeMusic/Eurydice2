@@ -1,4 +1,4 @@
-name: Deploy Eurydice API
+name: Lint and Test Eurydice API
 
 on:
   push:
@@ -14,9 +14,6 @@ on:
 
 env:
   NODE_VERSION: '22.x'
-  AZURE_WEBAPP_NAME: 'eurydice-api'
-  AZURE_WEBAPP_PACKAGE_PATH: './api'
-  SCRIPT_PATH: '.github/scripts/deploy.sh'
 
 jobs:
   lint-and-test:
@@ -43,110 +40,3 @@ jobs:
 
       - name: Run tests
         run: npm run test
-
-  build:
-    needs: lint-and-test
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: api/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-        env:
-          NODE_ENV: production
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-build
-          path: api/dist
-
-  deploy-staging:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: staging
-      url: https://eurydice-api-staging.azurewebsites.net
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: api-build
-          path: api/dist
-
-      - name: Deploy to Azure App Service (Staging)
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          slot-name: staging
-          publish-profile: ${{ secrets.AZURE_STAGING_PUBLISH_PROFILE }}
-          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
-
-  deploy-preview:
-    if: github.event_name == 'pull_request'
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: api-build
-          path: api/dist
-
-      - name: Deploy PR preview to Azure
-        run: |
-          echo "Deploying PR #${{ github.event.pull_request.number }} preview..."
-          az webapp deploy \
-            --resource-group eurydice-rg \
-            --name ${{ env.AZURE_WEBAPP_NAME }}-pr-${{ github.event.pull_request.number }} \
-            --src-path api/dist \
-            --type zip
-        shell: bash
-        env:
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_SECRET: ${{ secrets.AZURE_SECRET }}
-
-  deploy-production:
-    needs: [deploy-staging, build]
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: api-build
-          path: api/dist
-
-      - name: Deploy to Azure App Service (Production)
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          slot-name: production
-          publish-profile: ${{ secrets.AZURE_PRODUCTION_PUBLISH_PROFILE }}
-          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
