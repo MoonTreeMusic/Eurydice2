@@ -1,5 +1,4 @@
 import ffmpeg from 'fluent-ffmpeg'
-import { config } from '../config/index.js'
 
 export interface FfprobeMetadata {
   title: string

@@ -13,12 +13,6 @@ interface AzureADTokenPayload {
   azp?: string
 }
 
-interface AppIdentityPayload {
-  appid: string
-  azp: string
-  sub: string
-}
-
 interface RequestUser extends AzureADTokenPayload {
   accessToken: string
 }
