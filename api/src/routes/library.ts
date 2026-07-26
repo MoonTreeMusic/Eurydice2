@@ -11,8 +11,9 @@ const router = Router()
 
 router.get('/tracks', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
-    const tracks = await getAllTracks(userId)
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
+    const tracks = await getAllTracks(userId, userAccessToken)
     res.json({ tracks })
   } catch (error) {
     console.error('Error getting tracks:', error)
@@ -26,7 +27,8 @@ router.get('/tracks', async (req: Request, res: Response) => {
 
 router.post('/scan', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const { files } = req.body
 
     if (!Array.isArray(files) || files.length === 0) {
@@ -43,7 +45,7 @@ router.post('/scan', async (req: Request, res: Response) => {
       data: Buffer.from(f.data, 'base64'),
     }))
 
-    const result = await scanFolder(userId, validatedFiles)
+    const result = await scanFolder(userId, userAccessToken, validatedFiles)
     res.json(result)
   } catch (error) {
     console.error('Error scanning folder:', error)
@@ -57,7 +59,8 @@ router.post('/scan', async (req: Request, res: Response) => {
 
 router.delete('/tracks/:id', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const trackId = parseInt(String(req.params.id), 10)
 
     if (isNaN(trackId)) {
@@ -69,7 +72,7 @@ router.delete('/tracks/:id', async (req: Request, res: Response) => {
       return
     }
 
-    const result = await deleteTrack(userId, trackId)
+    const result = await deleteTrack(userId, userAccessToken, trackId)
     res.json(result)
   } catch (error) {
     console.error('Error deleting track:', error)
@@ -83,9 +86,10 @@ router.delete('/tracks/:id', async (req: Request, res: Response) => {
 
 router.get('/settings/:key', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const key = String(req.params.key)
-    const value = await getSetting(userId, key)
+    const value = await getSetting(userId, userAccessToken, key)
     res.json({ key, value })
   } catch (error) {
     console.error('Error getting setting:', error)
@@ -99,11 +103,12 @@ router.get('/settings/:key', async (req: Request, res: Response) => {
 
 router.put('/settings/:key', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const key = String(req.params.key)
     const { value } = req.body
 
-    const result = await setSetting(userId, key, value)
+    const result = await setSetting(userId, userAccessToken, key, value)
     res.json(result)
   } catch (error) {
     console.error('Error setting setting:', error)

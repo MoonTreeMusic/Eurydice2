@@ -14,8 +14,9 @@ const router = Router()
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
-    const playlists = await getAllPlaylists(userId)
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
+    const playlists = await getAllPlaylists(userId, userAccessToken)
     res.json({ playlists })
   } catch (error) {
     console.error('Error getting playlists:', error)
@@ -29,7 +30,8 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const { name } = req.body
 
     if (!name || typeof name !== 'string') {
@@ -41,7 +43,7 @@ router.post('/', async (req: Request, res: Response) => {
       return
     }
 
-    const playlist = await createPlaylist(userId, name)
+    const playlist = await createPlaylist(userId, userAccessToken, name)
     res.status(201).json(playlist)
   } catch (error) {
     console.error('Error creating playlist:', error)
@@ -55,7 +57,8 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const playlistId = parseInt(String(req.params.id), 10)
 
     if (isNaN(playlistId)) {
@@ -67,7 +70,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       return
     }
 
-    const playlist = await getPlaylistWithTracks(userId, playlistId)
+    const playlist = await getPlaylistWithTracks(userId, userAccessToken, playlistId)
 
     if (!playlist) {
       res.status(404).json({
@@ -91,7 +94,8 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const playlistId = parseInt(String(req.params.id), 10)
     const { name } = req.body
 
@@ -113,7 +117,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       return
     }
 
-    const playlist = await renamePlaylist(userId, playlistId, name)
+    const playlist = await renamePlaylist(userId, userAccessToken, playlistId, name)
 
     if (!playlist) {
       res.status(404).json({
@@ -137,7 +141,8 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const playlistId = parseInt(String(req.params.id), 10)
 
     if (isNaN(playlistId)) {
@@ -149,7 +154,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
       return
     }
 
-    await deletePlaylist(userId, playlistId)
+    await deletePlaylist(userId, userAccessToken, playlistId)
     res.status(204).send()
   } catch (error) {
     console.error('Error deleting playlist:', error)
@@ -163,7 +168,8 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
 router.post('/:id/tracks', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const playlistId = parseInt(String(req.params.id), 10)
     const { trackId } = req.body
 
@@ -185,7 +191,7 @@ router.post('/:id/tracks', async (req: Request, res: Response) => {
       return
     }
 
-    const playlist = await addTrackToPlaylist(userId, playlistId, trackId)
+    const playlist = await addTrackToPlaylist(userId, userAccessToken, playlistId, trackId)
 
     if (!playlist) {
       res.status(404).json({
@@ -209,7 +215,8 @@ router.post('/:id/tracks', async (req: Request, res: Response) => {
 
 router.delete('/:id/tracks/:trackId', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const playlistId = parseInt(String(req.params.id), 10)
     const trackId = parseInt(String(req.params.trackId), 10)
 
@@ -222,7 +229,7 @@ router.delete('/:id/tracks/:trackId', async (req: Request, res: Response) => {
       return
     }
 
-    const playlist = await removeTrackFromPlaylist(userId, playlistId, trackId)
+    const playlist = await removeTrackFromPlaylist(userId, userAccessToken, playlistId, trackId)
 
     if (!playlist) {
       res.status(404).json({
@@ -246,7 +253,8 @@ router.delete('/:id/tracks/:trackId', async (req: Request, res: Response) => {
 
 router.put('/:id/tracks', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const playlistId = parseInt(String(req.params.id), 10)
     const { trackIds } = req.body
 
@@ -268,7 +276,7 @@ router.put('/:id/tracks', async (req: Request, res: Response) => {
       return
     }
 
-    const playlist = await reorderPlaylistTracks(userId, playlistId, trackIds)
+    const playlist = await reorderPlaylistTracks(userId, userAccessToken, playlistId, trackIds)
 
     if (!playlist) {
       res.status(404).json({

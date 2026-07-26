@@ -4,7 +4,6 @@ export interface Config {
   azure: {
     storageAccountName: string
     storageAccountKey?: string
-    storageConnectionString?: string
     blobServiceUrl: string
   }
   auth: {
@@ -12,8 +11,7 @@ export interface Config {
     clientId: string
     audience: string
     issuer: string
-    clientCertificatePath?: string
-    clientCertificatePassword?: string
+    clientSecret?: string
   }
   ffprobe: {
     path: string
@@ -29,7 +27,6 @@ export function loadConfig(): Config {
     azure: {
       storageAccountName: process.env.AZURE_STORAGE_ACCOUNT_NAME || '',
       storageAccountKey: process.env.AZURE_STORAGE_ACCOUNT_KEY,
-      storageConnectionString: process.env.AZURE_STORAGE_CONNECTION_STRING,
       blobServiceUrl: process.env.AZURE_BLOB_SERVICE_URL || 'https://blob.core.windows.net',
     },
     auth: {
@@ -37,8 +34,7 @@ export function loadConfig(): Config {
       clientId: process.env.AZURE_CLIENT_ID || '',
       audience: process.env.AZURE_API_AUDIENCE || '',
       issuer: process.env.AZURE_API_ISSUER || '',
-      clientCertificatePath: process.env.AZURE_CLIENT_CERTIFICATE_PATH,
-      clientCertificatePassword: process.env.AZURE_CLIENT_CERTIFICATE_PASSWORD,
+      clientSecret: process.env.AZURE_CLIENT_SECRET,
     },
     ffprobe: {
       path: process.env.FFPROBE_PATH || 'ffprobe',

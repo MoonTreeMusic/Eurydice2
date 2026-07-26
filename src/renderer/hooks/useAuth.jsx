@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true)
   const [account, setAccount] = useState(null)
   const [isCertAuth, setIsCertAuth] = useState(false)
+  const [initError, setInitError] = useState(null)
 
   useEffect(() => {
     const init = async () => {
@@ -25,7 +26,8 @@ export function AuthProvider({ children }) {
           setIsAuthenticated(true)
         }
       } catch (error) {
-        console.error('Auth initialization failed:', error)
+        console.error('[Auth] Initialization failed:', error.message || error)
+        setInitError(error.message || 'Authentication initialization failed. Check console for details.')
       } finally {
         setIsLoading(false)
       }
@@ -56,7 +58,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, account, login, logout, isCertAuth }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, account, login, logout, isCertAuth, initError }}>
       {children}
     </AuthContext.Provider>
   )

@@ -5,8 +5,8 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 
-export async function getAllTracks(userId: string): Promise<Track[]> {
-  const library = await getLibrary(userId)
+export async function getAllTracks(userId: string, userAccessToken: string): Promise<Track[]> {
+  const library = await getLibrary(userId, userAccessToken)
   return sortTracks(library.tracks)
 }
 
@@ -24,10 +24,11 @@ function sortTracks(tracks: Track[]): Track[] {
 
 export async function scanFolder(
   userId: string,
+  userAccessToken: string,
   files: { filename: string; data: Buffer }[],
   onProgress?: (current: number, total: number) => void
 ): Promise<{ count: number; tracks: Track[] }> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   let count = 0
   const tempDir = os.tmpdir()
 
@@ -41,7 +42,7 @@ export async function scanFolder(
       const metadata = await ffprobePromisified(tempFilePath)
       const trackId = library.nextId++
 
-      const blobPath = await uploadTrackFile(userId, trackId, filename, data)
+      const blobPath = await uploadTrackFile(userId, trackId, filename, data, userAccessToken)
 
       const track: Track = {
         id: trackId,
@@ -71,13 +72,13 @@ export async function scanFolder(
     onProgress?.(i + 1, files.length)
   }
 
-  await saveLibrary(userId, library)
+  await saveLibrary(userId, library, userAccessToken)
 
   return { count, tracks: sortTracks(library.tracks) }
 }
 
-export async function deleteTrack(userId: string, trackId: number): Promise<{ removed: number }> {
-  const library = await getLibrary(userId)
+export async function deleteTrack(userId: string, userAccessToken: string, trackId: number): Promise<{ removed: number }> {
+  const library = await getLibrary(userId, userAccessToken)
   const track = library.tracks.find((t) => t.id === trackId)
 
   if (!track) {
@@ -85,7 +86,7 @@ export async function deleteTrack(userId: string, trackId: number): Promise<{ re
   }
 
   try {
-    await deleteTrackFile(userId, track.path)
+    await deleteTrackFile(userId, track.path, userAccessToken)
   } catch (error) {
     console.error('Error deleting track file:', error)
   }
@@ -96,31 +97,33 @@ export async function deleteTrack(userId: string, trackId: number): Promise<{ re
     playlist.trackIds = playlist.trackIds.filter((id) => id !== trackId)
   }
 
-  await saveLibrary(userId, library)
+  await saveLibrary(userId, library, userAccessToken)
 
   return { removed: 1 }
 }
 
-export async function getSetting(userId: string, key: string): Promise<unknown> {
-  const library = await getLibrary(userId)
+export async function getSetting(userId: string, userAccessToken: string, key: string): Promise<unknown> {
+  const library = await getLibrary(userId, userAccessToken)
   return library.settings[key] ?? null
 }
 
 export async function setSetting(
   userId: string,
+  userAccessToken: string,
   key: string,
   value: unknown
 ): Promise<{ key: string; value: unknown }> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   library.settings[key] = value
-  await saveLibrary(userId, library)
+  await saveLibrary(userId, library, userAccessToken)
   return { key, value }
 }
 
 export async function getAllPlaylists(
-  userId: string
+  userId: string,
+  userAccessToken: string
 ): Promise<{ id: number; name: string; trackCount: number; createdAt: number }[]> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   return library.playlists.map((p) => ({
     id: p.id,
     name: p.name,
@@ -131,9 +134,10 @@ export async function getAllPlaylists(
 
 export async function getPlaylistWithTracks(
   userId: string,
+  userAccessToken: string,
   playlistId: number
 ): Promise<PlaylistWithTracks | null> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   const playlist = library.playlists.find((p) => p.id === playlistId)
 
   if (!playlist) {
@@ -149,9 +153,10 @@ export async function getPlaylistWithTracks(
 
 export async function createPlaylist(
   userId: string,
+  userAccessToken: string,
   name: string
 ): Promise<{ id: number; name: string; trackCount: number; createdAt: number }> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
 
   const playlist: Playlist = {
     id: library.nextPlaylistId++,
@@ -161,7 +166,7 @@ export async function createPlaylist(
   }
 
   library.playlists.push(playlist)
-  await saveLibrary(userId, library)
+  await saveLibrary(userId, library, userAccessToken)
 
   return {
     id: playlist.id,
@@ -173,10 +178,11 @@ export async function createPlaylist(
 
 export async function renamePlaylist(
   userId: string,
+  userAccessToken: string,
   playlistId: number,
   name: string
 ): Promise<PlaylistWithTracks | null> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   const playlist = library.playlists.find((p) => p.id === playlistId)
 
   if (!playlist) {
@@ -184,7 +190,7 @@ export async function renamePlaylist(
   }
 
   playlist.name = name.trim() || playlist.name
-  await saveLibrary(userId, library)
+  await saveLibrary(userId, library, userAccessToken)
 
   const tracks = playlist.trackIds
     .map((tid) => library.tracks.find((t) => t.id === tid))
@@ -193,18 +199,19 @@ export async function renamePlaylist(
   return { ...playlist, tracks }
 }
 
-export async function deletePlaylist(userId: string, playlistId: number): Promise<void> {
-  const library = await getLibrary(userId)
+export async function deletePlaylist(userId: string, userAccessToken: string, playlistId: number): Promise<void> {
+  const library = await getLibrary(userId, userAccessToken)
   library.playlists = library.playlists.filter((p) => p.id !== playlistId)
-  await saveLibrary(userId, library)
+  await saveLibrary(userId, library, userAccessToken)
 }
 
 export async function addTrackToPlaylist(
   userId: string,
+  userAccessToken: string,
   playlistId: number,
   trackId: number
 ): Promise<PlaylistWithTracks | null> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   const playlist = library.playlists.find((p) => p.id === playlistId)
 
   if (!playlist) {
@@ -213,7 +220,7 @@ export async function addTrackToPlaylist(
 
   if (!playlist.trackIds.includes(trackId)) {
     playlist.trackIds.push(trackId)
-    await saveLibrary(userId, library)
+    await saveLibrary(userId, library, userAccessToken)
   }
 
   const tracks = playlist.trackIds
@@ -225,10 +232,11 @@ export async function addTrackToPlaylist(
 
 export async function removeTrackFromPlaylist(
   userId: string,
+  userAccessToken: string,
   playlistId: number,
   trackId: number
 ): Promise<PlaylistWithTracks | null> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   const playlist = library.playlists.find((p) => p.id === playlistId)
 
   if (!playlist) {
@@ -236,7 +244,7 @@ export async function removeTrackFromPlaylist(
   }
 
   playlist.trackIds = playlist.trackIds.filter((id) => id !== trackId)
-  await saveLibrary(userId, library)
+  await saveLibrary(userId, library, userAccessToken)
 
   const tracks = playlist.trackIds
     .map((tid) => library.tracks.find((t) => t.id === tid))
@@ -247,10 +255,11 @@ export async function removeTrackFromPlaylist(
 
 export async function reorderPlaylistTracks(
   userId: string,
+  userAccessToken: string,
   playlistId: number,
   trackIds: number[]
 ): Promise<PlaylistWithTracks | null> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   const playlist = library.playlists.find((p) => p.id === playlistId)
 
   if (!playlist) {
@@ -258,7 +267,7 @@ export async function reorderPlaylistTracks(
   }
 
   playlist.trackIds = trackIds
-  await saveLibrary(userId, library)
+  await saveLibrary(userId, library, userAccessToken)
 
   const tracks = playlist.trackIds
     .map((tid) => library.tracks.find((t) => t.id === tid))
@@ -269,8 +278,9 @@ export async function reorderPlaylistTracks(
 
 export async function getTrackById(
   userId: string,
+  userAccessToken: string,
   trackId: number
 ): Promise<Track | null> {
-  const library = await getLibrary(userId)
+  const library = await getLibrary(userId, userAccessToken)
   return library.tracks.find((t) => t.id === trackId) || null
 }

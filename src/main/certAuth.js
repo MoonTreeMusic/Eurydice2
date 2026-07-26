@@ -5,6 +5,12 @@ let cachedToken = null
 let tokenExpiry = null
 
 export function initCertAuth(config) {
+  if (!config.clientId || !config.tenantId) {
+    console.error('[CertAuth] ERROR: Missing required Azure configuration.')
+    console.error('[CertAuth] Ensure AZURE_CLIENT_ID and AZURE_TENANT_ID are set in your .env file.')
+    return null
+  }
+
   credential = new DeviceCodeCredential({
     clientId: config.clientId,
     tenantId: config.tenantId,

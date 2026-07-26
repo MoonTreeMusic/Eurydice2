@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -9,6 +10,13 @@ import playlistRoutes from './routes/playlists.js'
 import audioRoutes from './routes/audio.js'
 
 const app = express()
+
+console.log('[Config] Azure auth config:', {
+  tenantId: config.auth.tenantId ? '(set)' : '(MISSING)',
+  clientId: config.auth.clientId ? '(set)' : '(MISSING)',
+  audience: config.auth.audience,
+  issuer: config.auth.issuer,
+})
 
 app.use(helmet())
 app.use(cors({
