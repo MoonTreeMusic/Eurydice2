@@ -1,17 +1,8 @@
-const MSAL_CONFIG = {
-  auth: {
-    clientId: import.meta.env.VITE_AZURE_CLIENT_ID || '',
-    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}`,
-    redirectUri: 'http://localhost:5173',
-  },
-}
-
 class EurydiceApiClient {
   constructor() {
-    this.msalInstance = null
-    this.account = null
     this.accessToken = null
     this.apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+    this.useCertAuth = false
     const clientId = import.meta.env.VITE_AZURE_CLIENT_ID
     const tenantId = import.meta.env.VITE_AZURE_TENANT_ID
     const audience = import.meta.env.VITE_AZURE_API_AUDIENCE
@@ -27,89 +18,88 @@ class EurydiceApiClient {
   }
 
   async initialize() {
-    console.log('Initializing MSAL...')
-    const { PublicClientApplication } = await import('@azure/msal-browser')
-    this.msalInstance = new PublicClientApplication(MSAL_CONFIG)
-    await this.msalInstance.initialize()
-    console.log('MSAL initialized')
-
-    const accounts = this.msalInstance.getAllAccounts()
-    if (accounts.length > 0) {
-      this.account = accounts[0]
-      this.msalInstance.setActiveAccount(this.account)
-      console.log('Found existing account:', this.account)
+    if (window.electronAPI?.isCertAuthAvailable) {
+      this.useCertAuth = await window.electronAPI.isCertAuthAvailable()
+      console.log('Cert auth available:', this.useCertAuth)
     }
   }
 
   async login() {
-    console.log('Login called')
-    if (!this.msalInstance) await this.initialize()
+    if (this.useCertAuth) {
+      console.log('Using certificate auth')
+      return await this.acquireToken()
+    }
+
+    console.log('Using MSAL popup auth')
+    const MSAL_CONFIG = {
+      auth: {
+        clientId: import.meta.env.VITE_AZURE_CLIENT_ID || '',
+        authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}`,
+        redirectUri: 'http://localhost:5173',
+      },
+    }
+
+    const { PublicClientApplication } = await import('@azure/msal-browser')
+    const msalInstance = new PublicClientApplication(MSAL_CONFIG)
+    await msalInstance.initialize()
+
+    const accounts = msalInstance.getAllAccounts()
+    if (accounts.length > 0) {
+      msalInstance.setActiveAccount(accounts[0])
+    }
 
     const clientId = import.meta.env.VITE_AZURE_CLIENT_ID
-    // Use GUID-based scope for MSAL, not api:// format
     const apiScope = `${clientId}/.default`
-    const loginRequest = {
-      scopes: [apiScope],
-    }
-    console.log('Login request:', loginRequest)
+    const loginRequest = { scopes: [apiScope] }
 
     try {
-      const result = await this.msalInstance.loginPopup(loginRequest)
-      console.log('Login popup result:', result)
+      const result = await msalInstance.loginPopup(loginRequest)
       this.account = result.account
-      
-      // Now acquire token for API access
-      const tokenResult = await this.acquireToken()
-      console.log('Token acquisition result:', tokenResult)
-      
+      const tokenResult = await this._acquireTokenMsal(msalInstance)
       return tokenResult
     } catch (error) {
       console.error('Login failed:', error)
-      console.error('Error name:', error.name)
-      console.error('Error message:', error.message)
+      return false
+    }
+  }
+
+  async _acquireTokenMsal(msalInstance) {
+    const clientId = import.meta.env.VITE_AZURE_CLIENT_ID
+    const apiScope = `${clientId}/.default`
+    const tokenRequest = { scopes: [apiScope] }
+
+    try {
+      const result = await msalInstance.acquireTokenSilent({
+        ...tokenRequest,
+        account: msalInstance.getAllAccounts()[0],
+      })
+      this.accessToken = result.accessToken
+      return true
+    } catch (error) {
+      if (error.name === 'InteractionRequiredAuthError') {
+        const result = await msalInstance.acquireTokenPopup(tokenRequest)
+        this.accessToken = result.accessToken
+        return true
+      }
+      console.error('Token acquisition failed:', error)
       return false
     }
   }
 
   async acquireToken() {
-    if (!this.msalInstance || !this.account) {
-      console.log('Cannot acquire token: no MSAL instance or account')
-      return false
-    }
-
-    const clientId = import.meta.env.VITE_AZURE_CLIENT_ID
-    // Use GUID-based scope for MSAL
-    const apiScope = `${clientId}/.default`
-    const tokenRequest = {
-      scopes: [apiScope],
-    }
-
-    console.log('Acquiring token with request:', tokenRequest)
-
-    try {
-      const result = await this.msalInstance.acquireTokenSilent({
-        ...tokenRequest,
-        account: this.account,
-      })
-      this.accessToken = result.accessToken
-      console.log('Silent token acquired')
-      return true
-    } catch (error) {
-      console.log('Silent token failed:', error.name)
-      if (error.name === 'InteractionRequiredAuthError') {
-        try {
-          const result = await this.msalInstance.acquireTokenPopup(tokenRequest)
-          this.accessToken = result.accessToken
-          console.log('Popup token acquired')
+    if (this.useCertAuth) {
+      console.log('Acquiring token via certificate auth')
+      if (window.electronAPI?.getToken) {
+        const token = await window.electronAPI.getToken()
+        if (token) {
+          this.accessToken = token
           return true
-        } catch (popupError) {
-          console.error('Popup token acquisition failed:', popupError)
-          return false
         }
       }
-      console.error('Token acquisition failed:', error)
+      console.error('Failed to get token from main process')
       return false
     }
+    return false
   }
 
   async ensureAuthenticated() {

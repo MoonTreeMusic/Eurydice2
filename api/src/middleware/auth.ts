@@ -4,11 +4,19 @@ import jwksClient from 'jwks-rsa'
 import { config } from '../config/index.js'
 
 interface AzureADTokenPayload {
-  oid: string
+  oid?: string
   sub: string
   upn?: string
   email?: string
   name?: string
+  appid?: string
+  azp?: string
+}
+
+interface AppIdentityPayload {
+  appid: string
+  azp: string
+  sub: string
 }
 
 declare global {
@@ -75,12 +83,23 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       }
 
       const payload = decoded as AzureADTokenPayload
-      req.user = {
-        oid: payload.oid || payload.sub,
-        sub: payload.sub,
-        upn: payload.upn,
-        email: payload.email,
-        name: payload.name,
+
+      if (payload.appid) {
+        req.user = {
+          oid: payload.appid,
+          sub: payload.sub,
+          upn: payload.appid,
+          email: payload.appid,
+          name: `App:${payload.appid}`,
+        }
+      } else {
+        req.user = {
+          oid: payload.oid || payload.sub,
+          sub: payload.sub,
+          upn: payload.upn,
+          email: payload.email,
+          name: payload.name,
+        }
       }
 
       console.log('Auth successful for user:', req.user.oid)

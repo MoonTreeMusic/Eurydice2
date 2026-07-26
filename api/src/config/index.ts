@@ -12,6 +12,8 @@ export interface Config {
     clientId: string
     audience: string
     issuer: string
+    clientCertificatePath?: string
+    clientCertificatePassword?: string
   }
   ffprobe: {
     path: string
@@ -35,6 +37,8 @@ export function loadConfig(): Config {
       clientId: process.env.AZURE_CLIENT_ID || '',
       audience: process.env.AZURE_API_AUDIENCE || '',
       issuer: process.env.AZURE_API_ISSUER || '',
+      clientCertificatePath: process.env.AZURE_CLIENT_CERTIFICATE_PATH,
+      clientCertificatePassword: process.env.AZURE_CLIENT_CERTIFICATE_PASSWORD,
     },
     ffprobe: {
       path: process.env.FFPROBE_PATH || 'ffprobe',

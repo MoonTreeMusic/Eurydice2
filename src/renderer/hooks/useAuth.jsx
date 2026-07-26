@@ -7,18 +7,25 @@ export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [account, setAccount] = useState(null)
+  const [isCertAuth, setIsCertAuth] = useState(false)
 
   useEffect(() => {
     const init = async () => {
       try {
         await apiClient.initialize()
         const acc = apiClient.getAccount()
-        if (acc) {
+        const isCert = apiClient.useCertAuth
+        setIsCertAuth(isCert)
+
+        if (isCert) {
+          setIsAuthenticated(apiClient.isAuthenticated())
+          setAccount({ name: 'App Identity (Cert Auth)', username: 'cert-auth' })
+        } else if (acc) {
           setAccount(acc)
           setIsAuthenticated(true)
         }
       } catch (error) {
-        console.error('MSAL initialization failed:', error)
+        console.error('Auth initialization failed:', error)
       } finally {
         setIsLoading(false)
       }
@@ -30,7 +37,10 @@ export function AuthProvider({ children }) {
     try {
       const success = await apiClient.login()
       if (success) {
-        setAccount(apiClient.getAccount())
+        const acc = apiClient.getAccount()
+        if (acc) {
+          setAccount(acc)
+        }
         setIsAuthenticated(true)
       }
       return success
@@ -46,7 +56,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, account, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, account, login, logout, isCertAuth }}>
       {children}
     </AuthContext.Provider>
   )
