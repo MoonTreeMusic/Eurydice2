@@ -1,7 +1,10 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { fileURLToPath } from 'url'
 import path from 'path'
+import { config } from 'dotenv'
+config()
 import { localFileUrl } from '../shared/format.js'
+import { initCertAuth, getTokenWithCert, isCertAuthEnabled } from './certAuth.js'
 import {
   loadLibrary,
   scanFolder,
@@ -35,7 +38,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false, // Allow local file:// URLs in audio elements
     },
   })
 
@@ -47,6 +49,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  initCertAuth({
+    clientId: process.env.AZURE_CLIENT_ID,
+    tenantId: process.env.AZURE_TENANT_ID,
+    managedIdentityClientId: process.env.AZURE_MANAGED_IDENTITY_CLIENT_ID,
+  })
+
   loadLibrary()
 
   createWindow()
@@ -115,3 +123,16 @@ ipcMain.handle('playlist:remove-track', (_e, playlistId, trackId) =>
 ipcMain.handle('playlist:reorder', (_e, playlistId, trackIds) =>
   reorderPlaylistTracks(playlistId, trackIds)
 )
+
+// ── Auth IPC ────────────────────────────────────────────────────────────────────
+
+ipcMain.handle('auth:get-token', async () => {
+  return await getTokenWithCert({
+    clientId: process.env.AZURE_CLIENT_ID,
+    apiScope: `api://${process.env.AZURE_CLIENT_ID}/.default`,
+  })
+})
+
+ipcMain.handle('auth:is-cert-auth', () => {
+  return isCertAuthEnabled()
+})

@@ -4,11 +4,19 @@ import jwksClient from 'jwks-rsa'
 import { config } from '../config/index.js'
 
 interface AzureADTokenPayload {
-  oid: string
+  oid?: string
   sub: string
   upn?: string
   email?: string
   name?: string
+  appid?: string
+  azp?: string
+}
+
+interface AppIdentityPayload {
+  appid: string
+  azp: string
+  sub: string
 }
 
 declare global {
@@ -38,6 +46,7 @@ function getSigningKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback):
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization
+  console.log('Auth middleware:', { path: req.path, hasAuth: !!authHeader })
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({
@@ -49,6 +58,9 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   const token = authHeader.substring(7)
+  console.log('Token starts with:', token.substring(0, 50) + '...')
+
+  console.log('Validating with audience:', config.auth.audience, 'issuer:', config.auth.issuer)
 
   jwt.verify(
     token,
@@ -61,23 +73,36 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     (err, decoded) => {
       if (err) {
         console.error('JWT validation error:', err.message)
+        console.error('JWT validation error details:', err.name)
         res.status(401).json({
           error: 'Unauthorized',
-          message: 'Invalid or expired token',
+          message: 'Invalid or expired token: ' + err.message,
           statusCode: 401,
         })
         return
       }
 
       const payload = decoded as AzureADTokenPayload
-      req.user = {
-        oid: payload.oid || payload.sub,
-        sub: payload.sub,
-        upn: payload.upn,
-        email: payload.email,
-        name: payload.name,
+
+      if (payload.appid) {
+        req.user = {
+          oid: payload.appid,
+          sub: payload.sub,
+          upn: payload.appid,
+          email: payload.appid,
+          name: `App:${payload.appid}`,
+        }
+      } else {
+        req.user = {
+          oid: payload.oid || payload.sub,
+          sub: payload.sub,
+          upn: payload.upn,
+          email: payload.email,
+          name: payload.name,
+        }
       }
 
+      console.log('Auth successful for user:', req.user.oid)
       next()
     }
   )

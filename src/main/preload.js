@@ -27,4 +27,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('playlist:remove-track', playlistId, trackId),
   reorderPlaylistTracks: (playlistId, trackIds) =>
     ipcRenderer.invoke('playlist:reorder', playlistId, trackIds),
+
+  // Auth API
+  getToken: () => ipcRenderer.invoke('auth:get-token'),
+  isCertAuthAvailable: () => ipcRenderer.invoke('auth:is-cert-auth'),
 })
