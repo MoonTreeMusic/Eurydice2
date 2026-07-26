@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version-file: 'api/.nvmrc'
+          node-version-file: '.nvmrc'  # Changed from 'api/.nvmrc' to '.nvmrc'
           cache: 'npm'
           cache-dependency-path: api/package-lock.json
 
