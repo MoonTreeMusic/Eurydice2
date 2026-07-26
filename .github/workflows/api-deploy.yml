@@ -31,6 +31,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: api/package-lock.json
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
 
       - name: Install dependencies
         run: npm ci
