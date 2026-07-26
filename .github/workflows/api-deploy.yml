@@ -31,11 +31,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: api/package-lock.json
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
+
+      - name: Clear npm cache
+        run: npm cache clean --force
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --verbose
 
       - name: Run linter
         run: npm run lint
