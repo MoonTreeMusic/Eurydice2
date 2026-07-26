@@ -6,7 +6,8 @@ const router = Router()
 
 router.get('/:trackId/url', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.oid
+    const userId = req.user!.oid!
+    const userAccessToken = req.user!.accessToken
     const trackId = parseInt(String(req.params.trackId), 10)
 
     if (isNaN(trackId)) {
@@ -18,7 +19,7 @@ router.get('/:trackId/url', async (req: Request, res: Response) => {
       return
     }
 
-    const track = await getTrackById(userId, trackId)
+    const track = await getTrackById(userId, userAccessToken, trackId)
 
     if (!track) {
       res.status(404).json({
@@ -30,7 +31,7 @@ router.get('/:trackId/url', async (req: Request, res: Response) => {
     }
 
     const expiresInSeconds = 3600
-    const { url, expiresAt } = await getSignedTrackUrl(userId, track.path, expiresInSeconds)
+    const { url, expiresAt } = await getSignedTrackUrl(userId, track.path, userAccessToken, expiresInSeconds)
 
     res.json({ url, expiresAt })
   } catch (error) {

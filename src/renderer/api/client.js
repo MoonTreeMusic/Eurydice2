@@ -18,6 +18,15 @@ class EurydiceApiClient {
   }
 
   async initialize() {
+    const clientId = import.meta.env.VITE_AZURE_CLIENT_ID
+    const tenantId = import.meta.env.VITE_AZURE_TENANT_ID
+
+    if (!clientId || !tenantId) {
+      console.error('[ApiClient] ERROR: Missing required Azure configuration.')
+      console.error('[ApiClient] Ensure VITE_AZURE_CLIENT_ID and VITE_AZURE_TENANT_ID are set in src/renderer/.env')
+      throw new Error('Missing Azure configuration. See console for details.')
+    }
+
     if (window.electronAPI?.isCertAuthAvailable) {
       this.useCertAuth = await window.electronAPI.isCertAuthAvailable()
       console.log('Cert auth available:', this.useCertAuth)
@@ -34,7 +43,7 @@ class EurydiceApiClient {
     const MSAL_CONFIG = {
       auth: {
         clientId: import.meta.env.VITE_AZURE_CLIENT_ID || '',
-        authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}`,
+        authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}/v2.0`,
         redirectUri: 'http://localhost:5173',
       },
     }
@@ -150,24 +159,10 @@ class EurydiceApiClient {
   }
 
   async scanFolder(files) {
-    await this.ensureAuthenticated()
-
-    const headers = {
-      Authorization: `Bearer ${this.accessToken}`,
-    }
-
-    const response = await fetch(`${this.apiBaseUrl}/api/library/scan`, {
+    return this.fetch('/api/library/scan', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ files }),
     })
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }))
-      throw new Error(error.message || `API error: ${response.status}`)
-    }
-
-    return response.json()
   }
 
   async deleteTrack(id) {

@@ -19,10 +19,14 @@ interface AppIdentityPayload {
   sub: string
 }
 
+interface RequestUser extends AzureADTokenPayload {
+  accessToken: string
+}
+
 declare global {
   namespace Express {
     interface Request {
-      user?: AzureADTokenPayload
+      user?: RequestUser
     }
   }
 }
@@ -60,17 +64,26 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   const token = authHeader.substring(7)
   console.log('Token starts with:', token.substring(0, 50) + '...')
 
-  console.log('Validating with audience:', config.auth.audience, 'issuer:', config.auth.issuer)
+  const decodedToken = jwt.decode(token, { complete: true }) as { header: object; payload: { iss?: string; aud?: string } } | null
+  console.log('Token header:', JSON.stringify(decodedToken?.header))
+  console.log('Token payload iss:', decodedToken?.payload?.iss)
+  console.log('Token payload aud:', decodedToken?.payload?.aud)
+  console.log('Expected audience:', config.auth.audience, 'issuer:', config.auth.issuer)
+
+  const validIssuers: [string, ...string[]] = [
+    config.auth.issuer,
+    `https://sts.windows.net/${config.auth.tenantId}/`,
+  ]
 
   jwt.verify(
     token,
     getSigningKey,
     {
       audience: config.auth.audience,
-      issuer: config.auth.issuer,
+      issuer: validIssuers,
       algorithms: ['RS256'],
     },
-    (err, decoded) => {
+    (err: Error | null, decoded: unknown) => {
       if (err) {
         console.error('JWT validation error:', err.message)
         console.error('JWT validation error details:', err.name)
@@ -91,6 +104,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
           upn: payload.appid,
           email: payload.appid,
           name: `App:${payload.appid}`,
+          accessToken: token,
         }
       } else {
         req.user = {
@@ -99,6 +113,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
           upn: payload.upn,
           email: payload.email,
           name: payload.name,
+          accessToken: token,
         }
       }
 
