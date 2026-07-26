@@ -39,7 +39,8 @@ async function getBlobServiceClientForUser(userAccessToken: string): Promise<Blo
   return new BlobServiceClient(blobServiceUrl, credential)
 }
 
-async function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function streamToString(stream: any): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: string[] = []
     stream.on('data', (chunk: string | Buffer) => {
